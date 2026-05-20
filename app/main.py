@@ -44,7 +44,7 @@ class Token(BaseModel):
     token_type: str
 
 class TransferRequest(BaseModel):
-    recipient_account: str = Field(..., min_length=10, max_length=12, regex="^[0-9]+$")
+    recipient_account: str = Field(..., min_length=10, max_length=12, pattern="^[0-9]+$")
     amount: float = Field(..., gt=0, lt=100000)
 
 class AuditLogResponse(BaseModel):
