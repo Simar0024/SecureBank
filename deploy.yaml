@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: securebank-api-deployment
+  namespace: secure-core
+  labels:
+    app.kubernetes.io/component: core-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: securebank-api
+  template:
+    metadata:
+      labels:
+        app: securebank-api
+    spec:
+      containers:
+      - name: api-node
+        image: securebankregistry.azurecr.io/core/api:v1.0.0
+        ports:
+        - containerPort: 8000
+        # Hardening Container Runtime Permissions
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "250m"
+            memory: "256Mi"

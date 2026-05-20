@@ -1,0 +1,28 @@
+version: '3.8'
+
+networks:
+  securebank-isolated-net:
+    driver: bridge
+
+services:
+  backend-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - securebank-isolated-net
+    environment:
+      - ENVIRONMENT=development
+
+  frontend-portal:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./public:/usr/share/nginx/html # Mounts your frontend code into Nginx
+    networks:
+      - securebank-isolated-net
+    depends_on:
+      - backend-api
