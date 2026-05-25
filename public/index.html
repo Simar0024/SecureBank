@@ -1,11 +1,11 @@
-<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' http://localhost:8000;">
     <title>SecureBank Core Portal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/tailwind.css">
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
@@ -14,7 +14,8 @@
             <span id="roleBadge" class="hidden px-3 py-1 text-xs rounded-full bg-emerald-900 text-emerald-300 font-mono"></span>
         </header>
 
-        <!-- AUTH SECTOR -->
+        <div id="globalAlert" class="hidden mb-6 p-4 rounded bg-red-900/50 border border-red-700 text-red-200 text-sm font-mono"></div>
+
         <section id="authSection" class="bg-gray-800 p-6 rounded-lg border border-gray-700 max-w-md mx-auto">
             <h2 class="text-lg font-semibold mb-4 text-gray-200">Terminal Gate Authentication</h2>
             <div class="space-y-4">
@@ -26,14 +27,12 @@
                     <label class="block text-xs font-mono mb-1 text-gray-400">CREDENTIAL PASS</label>
                     <input type="password" id="password" value="securepassword" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
                 </div>
-                <button onclick="authenticateSession()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded transition-colors duration-150">Initialize Secure Session</button>
+                <button id="btnAuthenticate" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded transition-colors duration-150">Initialize Secure Session</button>
             </div>
         </section>
 
-        <!-- DASHBOARD SECTOR -->
         <section id="dashboardSection" class="hidden space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Transfer Panel -->
                 <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
                     <h3 class="text-md font-semibold mb-4 text-emerald-400">Encrypted Clearing Network</h3>
                     <div class="space-y-4">
@@ -45,85 +44,21 @@
                             <label class="block text-xs font-mono mb-1 text-gray-400">AMOUNT (USD)</label>
                             <input type="number" id="amount" placeholder="250.00" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
                         </div>
-                        <button onclick="executeTransferRequest()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded transition-colors duration-150">Sign & Authorize Transfer</button>
+                        <button id="btnTransfer" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded transition-colors duration-150">Sign & Authorize Transfer</button>
                     </div>
                 </div>
 
-                <!-- SOC / Compliance Monitor Panel -->
                 <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
                     <h3 class="text-md font-semibold mb-4 text-red-400">SOC Operational Audit Monitor</h3>
                     <p class="text-xs text-gray-400 mb-4">Requires privileged elevation claims (`ComplianceOfficer` role permissions mapping).</p>
-                    <button onclick="fetchAuditMetrics()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 rounded transition-colors duration-150 mb-4">Query Incident Stream</button>
+                    <button id="btnAudit" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 rounded transition-colors duration-150 mb-4">Query Incident Stream</button>
                     <div id="auditLogOutput" class="text-xs font-mono bg-gray-900 p-3 rounded border border-gray-800 max-h-40 overflow-y-auto text-gray-400">Awaiting clearance command execution...</div>
                 </div>
             </div>
-            <button onclick="destroySession()" class="text-xs text-gray-500 hover:text-red-400 transition-colors duration-150 underline">Terminate Active Cryptographic Session Token</button>
+            <button id="btnDestroy" class="text-xs text-gray-500 hover:text-red-400 transition-colors duration-150 underline">Terminate Active Cryptographic Session Token</button>
         </section>
     </div>
 
-    <script>
-        let sessionToken = "";
-        const API_BASE = "http://localhost:8000/api/v1"; // Update to deployment ingress path
-
-        async function authenticateSession() {
-            const formData = new URLSearchParams();
-            formData.append('username', document.getElementById('username').value);
-            formData.append('password', document.getElementById('password').value);
-
-            try {
-                const response = await fetch(`${API_BASE}/auth/token`, { method: 'POST', body: formData });
-                if (!response.ok) throw new Error("Invalid access parameters matched.");
-                const data = await response.json();
-                
-                sessionToken = data.access_token;
-                
-                // Parse JWT locally to display frontend contextual views
-                const tokenBase64 = sessionToken.split('.')[1];
-                const parsedData = JSON.parse(atob(tokenBase64));
-
-                document.getElementById('authSection').classList.add('hidden');
-                document.getElementById('dashboardSection').classList.remove('hidden');
-                
-                const badge = document.getElementById('roleBadge');
-                badge.innerText = `ROLE: ${parsedData.role}`;
-                badge.classList.remove('hidden');
-            } catch (err) {
-                alert(err.message);
-            }
-        }
-
-        async function executeTransferRequest() {
-            const payload = {
-                recipient_account: document.getElementById('targetAccount').value,
-                amount: parseFloat(document.getElementById('amount').value)
-            };
-
-            const response = await fetch(`${API_BASE}/transactions/transfer`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                body: JSON.stringify(payload)
-            });
-            const output = await response.json();
-            alert(output.detail ? `Access Denied: ${output.detail}` : `Network Broadcast: ${output.message}`);
-        }
-
-        async function fetchAuditMetrics() {
-            const response = await fetch(`${API_BASE}/audit/logs`, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${sessionToken}` }
-            });
-            const output = await response.json();
-            if(response.status === 403) {
-                document.getElementById('auditLogOutput').innerText = "CRITICAL ALERT: [403 Forbidden] Operation flagged as structural intrusion event.";
-                return;
-            }
-            document.getElementById('auditLogOutput').innerText = JSON.stringify(output, null, 2);
-        }
-
-        function destroySession() {
-            sessionToken = "";
-            location.reload();
-        }
-    </script>
+    <script src="/js/security.js"></script>
 </body>
 </html>

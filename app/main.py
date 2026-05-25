@@ -1,11 +1,21 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Security
+# app/main.py
+from fastapi import FastAPI, Depends, HTTPException, status, Security, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import jwt
 import datetime
 import logging
+
+# --- SECURITY ENGINE INITIALIZATION ---
+ph = PasswordHasher()
+limiter = Limiter(key_func=get_remote_address)
 
 # --- SOC AUDIT LOGGING CONFIGURATION ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] SOC_AUDIT: %(message)s')
@@ -22,21 +32,57 @@ app = FastAPI(
     redoc_url=None
 )
 
-# Enforcing CORS Whitelisting
+# Register Slowapi Exception Handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+ORIGIN_WHITELIST = [
+    "http://localhost",       # Your Frontend Portal UI (Port 80)
+    "http://localhost:8000",  # Your Swagger Docs / Dev Backend UI
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, swap with specific frontend origin domain
+    allow_origins=ORIGIN_WHITELIST, 
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/token")
+# --- ADVANCED CLOUD SECURITY: DOUBLE-SUBMIT CSRF PROTECTION MIDDLEWARE ---
+@app.middleware("http")
+async def verify_csrf_protection_token(request: Request, call_next):
+    # Enforce token tracking verification checks on mutating operations
+    if request.method in ["POST", "PUT", "DELETE"]:
+        # Bypass initial session initialization token endpoint
+        if request.url.path != "/api/v1/auth/token":
+            csrf_cookie = request.cookies.get("X-CSRF-Token")
+            csrf_header = request.headers.get("X-CSRF-Token")
+            
+            if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+                logger.warning("CSRF validation mismatch token verification anomaly triggered.")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, 
+                    detail="CSRF Token Missing or Invalid."
+                )
+                
+    response = await call_next(request)
+    return response
 
-# Mock User DB containing pre-hashed passwords & scoped roles
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+
+# Production Baseline: Safe Argon2id password hashes replacing plain text keys
 USER_DB = {
-    "admin@securebank.com": {"password": "password123", "role": "ComplianceOfficer", "scopes": ["audit", "read"]},
-    "simar@securebank.com": {"password": "securepassword", "role": "Customer", "scopes": ["read", "transfer"]}
+    "admin@securebank.com": {
+        "password_hash": ph.hash("password123"), 
+        "role": "ComplianceOfficer", 
+        "scopes": ["audit", "read"]
+    },
+    "simar@securebank.com": {
+        "password_hash": ph.hash("securepassword"), 
+        "role": "Customer", 
+        "scopes": ["read", "transfer"]
+    }
 }
 
 class Token(BaseModel):
@@ -73,22 +119,33 @@ def verify_jwt_and_scope(required_scope: str):
 
 GENERIC_DENIAL_MSG = "Unauthorized scope access attempt by User: {} for scope: {}"
 
+# RATE LIMITED ENDPOINT: Enforces a maximum of 5 auth attempts per minute per IP to block brute-force scripts
 @app.post("/api/v1/auth/token", response_model=Token, tags=["Authentication"])
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = USER_DB.get(form_data.username)
-    if not user or form_data.password != user["password"]:
-        logger.warning(f"Failed login attempt for identification user identity: {form_data.username}")
+@limiter.limit("5/minute")
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+    clean_username = form_data.username.strip().lower()
+    user = USER_DB.get(clean_username)
+    
+    if not user:
+        logger.warning(f"Failed login attempt for identification user identity: {clean_username}")
         raise HTTPException(status_code=400, detail="Incorrect email address or password configuration")
     
+    try:
+        # Cryptographically compare password with the stored hash
+        ph.verify(user["password_hash"], form_data.password)
+    except VerifyMismatchError:
+        logger.warning(f"Failed login attempt for identification user identity: {clean_username}")
+        raise HTTPException(status_code=400, detail="Incorrect email address or password configuration")
+        
     token_expiry = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
     token_payload = {
-        "sub": form_data.username,
+        "sub": clean_username,
         "role": user["role"],
         "scopes": user["scopes"],
         "exp": token_expiry
     }
     encoded_jwt = jwt.encode(token_payload, SECRET_KEY, algorithm=ALGORITHM)
-    logger.info(f"Successful user login session generated for: {form_data.username} [Role: {user['role']}]")
+    logger.info(f"Successful user login session generated for: {clean_username} [Role: {user['role']}]")
     return {"access_token": encoded_jwt, "token_type": "bearer"}
 
 @app.post("/api/v1/transactions/transfer", tags=["Transactions"])
