@@ -64,8 +64,8 @@ jobs:
     - name: Run Datree Policy Compliance Verification
       run: |
         # Runs containerized to remove requirements for local binary setup installation paths
-        if [ -f "deployment.yaml" ]; then
-          docker run --rm -v $(pwd):/workspace datree/datree:latest test /workspace/deployment.yaml --schema-version 1.28.0 || true
+        if [ -f "deploy.yaml" ]; then
+          docker run --rm -v $(pwd):/workspace datree/datree:latest test /workspace/deploy.yaml --schema-version 1.28.0 || true
         else
-          echo "No deployment.yaml matched in workspace root."
+          echo "No deploy.yaml matched in workspace root."
         fi
