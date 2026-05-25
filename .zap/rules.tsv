@@ -1,0 +1,4 @@
+# ID	NAME	THRESHOLD	OUTPUT
+10096	Timestamp Disclosure - Unix	OFF
+10020	Anti-CSRF Tokens Check	LOW
+40012	Cross-Domain Misconfiguration	OFF
