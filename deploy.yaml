@@ -36,3 +36,26 @@ spec:
           requests:
             cpu: "250m"
             memory: "256Mi"
+
+        # --- ADD THIS LIVENESS PROBE GATE ---
+        livenessProbe:
+          httpGet:
+            path: /api/docs  # Pings your Swagger endpoint to verify the service is alive
+            port: 8000
+          initialDelaySeconds: 10 # Gives Uvicorn 10 seconds to spin up before checking
+          periodSeconds: 15       # Re-check health every 15 seconds
+          timeoutSeconds: 2       # Must respond within 2 seconds
+          failureThreshold: 3     # Restart container if it fails 3 consecutive times
+
+        # --- ADD THIS READINESS PROBE GATE ---
+        readinessProbe:
+          httpGet:
+            path: /api/docs  # Verifies application is fully responsive before routing public traffic
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+          successThreshold: 1
+          failureThreshold: 2
+
+        
