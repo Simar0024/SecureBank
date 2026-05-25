@@ -21,7 +21,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./public:/usr/share/nginx/html:ro# Mounts your frontend code into Nginx
+      - ./public:/usr/share/nginx/html:ro # Mounts your frontend code into Nginx
     networks:
       - securebank-isolated-net
     depends_on:

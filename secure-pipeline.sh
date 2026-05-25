@@ -83,14 +83,17 @@ docker-compose down
 
 # --- PHASE 4D: ENHANCED KUBERNETES MANIFEST POLICY TESTING ---
 echo -e "\n${YELLOW}[Phase 4D] Executing Policy Validation Checks on AKS Manifests...${NC}"
-# Enhanced Layer: Running Datree completely containerized to assess deployment structures
-if [ -f "deployment.yaml" ]; then
+
+if [ -f "deploy.yaml" ]; then
+    echo -e "${BLUE}[*] Injecting offline environment flags and scanning manifests...${NC}"
+    
+    # -e DATREE_OFFLINE=local forces Datree to run completely air-gapped without mounting config files
     docker run --rm \
+        -e DATREE_OFFLINE=local \
         -v $(pwd):/workspace \
-        datree/datree:latest test /workspace/deployment.yaml \
-        --schema-version 1.28.0 || true
+        datree/datree:latest test /workspace/deploy.yaml --schema-version 1.28.0 || true
 else
-    echo -e "${RED}[!] deployment.yaml not found in current root working directory. Skipping.${NC}"
+    echo -e "${RED}[!] deploy.yaml not found in current root working directory. Skipping.${NC}"
 fi
 
 echo -e "\n${GREEN}==================================================================${NC}"
