@@ -40,8 +40,8 @@ jobs:
     - name: Initialize Sandbox Testing Infrastructure Stack
       run: |
         # Tear down any conflicting instances, then spin up the fresh build stack
-        docker-compose down --volumes --remove-orphans || true
-        docker-compose up -d --build
+        docker compose down --volumes --remove-orphans || true
+        docker compose up -d --build
         echo "Awaiting cluster endpoint stabilization..."
         sleep 12
 
@@ -58,7 +58,7 @@ jobs:
 
     - name: Teardown Sandbox Environment Stack
       if: always() # Ensures the containers are ALWAYS cleaned up even if the scan drops out
-      run: docker-compose down
+      run: docker compose down
 
     # --- 4D. KUBERNETES MANIFEST VALIDATION (OPA / DATREE) ---
     - name: Run Datree Policy Compliance Verification
