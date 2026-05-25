@@ -35,12 +35,12 @@ bandit -r ./app -x ./app/test_*.py -lll --format txt
 echo -e "\n${YELLOW}[Phase 4B] Compiling Target Container Image & Scanning Infrastructure...${NC}"
 docker build -t securebank-backend-api:local .
 
-# Enhanced Layer: Pulls the official Aqua Security Trivy container to avoid installing binaries locally
 echo -e "${BLUE}[*] Fetching Trivy scanning engine definitions...${NC}"
+# CORRECTED IMAGE PATH: Changed from aquasecurity/trivy to aquasec/trivy
 docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v $HOME/.cache:/root/.cache \
-    aquasecurity/trivy:latest image \
+    aquasec/trivy:latest image \
     --format table \
     --exit-code 1 \
     --ignore-unfixed \

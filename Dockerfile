@@ -1,16 +1,20 @@
 # Dockerfile
 FROM python:3.11-slim
+
 WORKDIR /workspace
 
-# Copy the requirements file into the container first
-COPY ./app/requirements.txt /workspace/requirements.txt
+# Install system dependencies if required
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install all listed production dependencies
+# Upgrade installation baseline components to clear lower-level build CVEs
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel==0.46.2
+
+# Copy and install requirement paths safely
+COPY app/requirements.txt /workspace/requirements.txt
 RUN pip install --no-cache-dir -r /workspace/requirements.txt
 
-# Copy the rest of your application code
-COPY ./app /workspace/app
+COPY . /workspace
 
-EXPOSE 8000
-USER 10001
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
